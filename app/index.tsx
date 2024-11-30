@@ -85,7 +85,7 @@ const Root: React.FC = () => {
 		theme: getTheme(initialTheme())
 	});
 	const initTheme = initialTheme();
-	const [themeState, setThemeState] = useState<IState>({
+	const [themeState] = useState<IState>({
 		...state,
 		width: dimensions.width,
 		height: dimensions.height,
