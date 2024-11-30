@@ -85,7 +85,7 @@ const Root: React.FC = () => {
 		theme: getTheme(initialTheme())
 	});
 	const initTheme = initialTheme();
-	const [themeState] = useState<IState>({
+	const [themeState, setThemeState] = useState<IState>({
 		...state,
 		width: dimensions.width,
 		height: dimensions.height,
@@ -188,6 +188,7 @@ const Root: React.FC = () => {
 
 		// Typecast newTheme to IThemePreference when setting state
 		setState(prevState => newThemeState(prevState, newTheme as IThemePreference));
+		setThemeState(prevstate => ({ ...prevstate, ...state }));
 	};
 
 	const getMasterDetail = (width: number) => {
