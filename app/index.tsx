@@ -94,7 +94,6 @@ const Root: React.FC = () => {
 	});
 
 	useEffect(() => {
-		// init function
 		const init = async () => {
 			store.dispatch(appInitLocalSettings());
 
@@ -124,7 +123,6 @@ const Root: React.FC = () => {
 			setMasterDetail(width);
 		};
 
-		// initialize
 		init();
 
 		if (!isFDroidBuild) {
@@ -157,9 +155,8 @@ const Root: React.FC = () => {
 	}, []);
 
 	useEffect(() => {
-		// Subscribe to Appearance changes whenever themePreferences changes
 		subscribeTheme(themePreferences, () => setTheme(themePreferences));
-	}, [themeState.themePreferences]); // Dependency array ensures this runs when `themePreferences` changes
+	}, [themeState.themePreferences]);
 
 	const initCrashReport = () => {
 		getAllowCrashReport().then(allowCrashReport => {
@@ -170,7 +167,7 @@ const Root: React.FC = () => {
 		});
 	};
 
-	// Handle dimensions change
+	// Dimensions update fires twice
 	const onDimensionsChange = debounce(({ window: { width, height, scale, fontScale } }: { window: IDimensions }) => {
 		setDimensions({
 			width,
@@ -186,7 +183,7 @@ const Root: React.FC = () => {
 			return;
 		}
 
-		// Typecast newTheme to IThemePreference when setting state
+		// Typecast newTheme to IThemePreference
 		setState(prevState => newThemeState(prevState, newTheme as IThemePreference));
 		setThemeState(prevstate => ({ ...prevstate, ...state }));
 	};
