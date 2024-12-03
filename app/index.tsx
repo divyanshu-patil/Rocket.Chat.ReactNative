@@ -133,7 +133,6 @@ const Root: React.FC = () => {
 			initTablet();
 		}
 
-		// Set the native theme for the app
 		setNativeTheme(initTheme);
 
 		const timeout = setTimeout(() => {
