@@ -17,7 +17,7 @@ import { IThemePreference } from './definitions/ITheme';
 import { DimensionsContext } from './dimensions';
 import { MIN_WIDTH_MASTER_DETAIL_LAYOUT, colors, isFDroidBuild, themes } from './lib/constants';
 import { getAllowAnalyticsEvents, getAllowCrashReport } from './lib/methods';
-import { debounce, isTablet } from './lib/methods/helpers';
+import { isTablet, useDebounce } from './lib/methods/helpers';
 import { toggleAnalyticsEventsReport, toggleCrashErrorsReport } from './lib/methods/helpers/log';
 import parseQuery from './lib/methods/helpers/parseQuery';
 import {
@@ -168,7 +168,7 @@ const Root: React.FC = () => {
 	};
 
 	// Dimensions update fires twice
-	const onDimensionsChange = debounce(({ window: { width, height, scale, fontScale } }: { window: IDimensions }) => {
+	const onDimensionsChange = useDebounce(({ window: { width, height, scale, fontScale } }: { window: IDimensions }) => {
 		setDimensions({
 			width,
 			height,
@@ -176,7 +176,7 @@ const Root: React.FC = () => {
 			fontScale
 		});
 		setMasterDetail(width);
-	});
+	}, 300); // TODO : review the wait value
 
 	const setTheme = (newTheme?: {} | undefined) => {
 		if (!newTheme) {
