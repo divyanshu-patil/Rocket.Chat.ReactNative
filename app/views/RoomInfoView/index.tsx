@@ -3,17 +3,17 @@ import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { uniq } from 'lodash';
 import isEmpty from 'lodash/isEmpty';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { type Subscription } from 'rxjs';
 import UAParser from 'ua-parser-js';
 
 import * as HeaderButton from '../../containers/Header/components/HeaderButton';
 import SafeAreaView from '../../containers/SafeAreaView';
-import { type ISubscription, type IUser, SubscriptionType } from '../../definitions';
+import { type IAttachment, type ISubscription, type IUser, SubscriptionType } from '../../definitions';
 import I18n from '../../i18n';
 import { getSubscriptionByRoomId } from '../../lib/database/services/Subscription';
 import { useAppSelector } from '../../lib/hooks/useAppSelector';
-import { getRoomTitle, getUidDirectMessage, hasPermission } from '../../lib/methods/helpers';
+import { getAvatarURL, getRoomTitle, getUidDirectMessage, hasPermission } from '../../lib/methods/helpers';
 import { goRoom } from '../../lib/methods/helpers/goRoom';
 import { handleIgnore } from '../../lib/methods/helpers/handleIgnore';
 import log, { events, logEvent } from '../../lib/methods/helpers/log';
@@ -58,7 +58,9 @@ const RoomInfoView = (): React.ReactElement => {
 		subscribedRoom,
 		usersRoles,
 		roles,
+		server,
 		serverVersion,
+		avatarExternalProviderUrl,
 		// permissions
 		editRoomPermission,
 		editOmnichannelContact,
@@ -68,7 +70,9 @@ const RoomInfoView = (): React.ReactElement => {
 		isMasterDetail: state.app.isMasterDetail,
 		roles: state.roles,
 		usersRoles: state.usersRoles,
+		server: state.server.server,
 		serverVersion: state.server.version,
+		avatarExternalProviderUrl: state.settings.Accounts_AvatarExternalProviderUrl as string,
 		// permissions
 		editRoomPermission: state.permissions['edit-room'],
 		editOmnichannelContact: state.permissions['edit-omnichannel-contact'],
@@ -283,18 +287,46 @@ const RoomInfoView = (): React.ReactElement => {
 		});
 	};
 
+	const getUserOrRoomAvatarUrl = () => {
+		const avatarUrl = getAvatarURL({
+			text: room.name || roomUser.username,
+			type: t,
+			userId: roomUser?._id,
+			serverVersion,
+			avatarExternalProviderUrl,
+			rid,
+			server,
+			avatarETag: roomUser?.avatarEtag,
+			size: 25 // doesn't seem changes in resolution
+		});
+		return avatarUrl;
+	};
+
+	const handleViewAvatar = () => {
+		const avatarUrl = getUserOrRoomAvatarUrl();
+		const attachment: IAttachment = {
+			image_url: avatarUrl,
+			title: room.name || roomUser?.name || ''
+		};
+		navigate('AttachmentView', { attachment });
+	};
+
 	return (
 		<ScrollView style={[styles.scroll, { backgroundColor: colors.surfaceRoom }]}>
 			<SafeAreaView style={{ backgroundColor: colors.surfaceRoom }} testID='room-info-view'>
 				<View style={[styles.avatarContainer, { backgroundColor: colors.surfaceHover }]}>
-					<RoomInfoViewAvatar
-						username={room?.name || roomUser.username}
-						rid={room?.rid}
-						userId={roomUser?._id}
-						handleEditAvatar={() => navigate('ChangeAvatarView', { titleHeader: I18n.t('Room_Info'), room, t, context: 'room' })}
-						showEdit={showEdit}
-						type={t}
-					/>
+					<Pressable onPress={() => (room || roomUser) && handleViewAvatar()}>
+						<RoomInfoViewAvatar
+							username={room?.name || roomUser.username}
+							rid={room?.rid}
+							userId={roomUser?._id}
+							handleEditAvatar={() =>
+								navigate('ChangeAvatarView', { titleHeader: I18n.t('Room_Info'), room, t, context: 'room' })
+							}
+							showEdit={showEdit}
+							type={t}
+						/>
+					</Pressable>
 					<RoomInfoViewTitle
 						type={t}
 						room={room || roomUser}
