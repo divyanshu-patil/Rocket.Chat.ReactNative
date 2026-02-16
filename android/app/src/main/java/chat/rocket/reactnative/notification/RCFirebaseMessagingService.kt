@@ -33,6 +33,7 @@ class RCFirebaseMessagingService : FirebaseMessagingService() {
             }
         }
 
+        Log.d("test", "on message receive:"+ bundle);
         // Process the notification
         try {
             val notification = CustomPushNotification(this, bundle)

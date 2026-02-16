@@ -14,6 +14,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.Bundle;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -33,34 +34,34 @@ import chat.rocket.reactnative.R;
 
 /**
  * Custom push notification handler for Rocket.Chat.
- * 
+ *
  * Handles standard push notifications and End-to-End encrypted (E2E) notifications.
  * Provides MessagingStyle notifications, direct reply, and advanced processing.
  */
 public class CustomPushNotification {
     private static final String TAG = "RocketChat.CustomPush";
     private static final boolean ENABLE_VERBOSE_LOGS = BuildConfig.DEBUG;
-    
+
     // Shared state
     private static final Gson gson = new Gson();
     private static final Map<String, List<Bundle>> notificationMessages = new ConcurrentHashMap<>();
-    
+
     // Constants
     public static final String KEY_REPLY = "KEY_REPLY";
     public static final String NOTIFICATION_ID = "NOTIFICATION_ID";
     private static final String CHANNEL_ID = "rocketchatrn_channel_01";
     private static final String CHANNEL_NAME = "All";
-    
+
     // Instance fields
     private final Context mContext;
     private volatile Bundle mBundle;
     private final NotificationManager notificationManager;
-    
+
     public CustomPushNotification(Context context, Bundle bundle) {
         this.mContext = context;
         this.mBundle = bundle;
         this.notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        
+
         // Ensure notification channel exists
         createNotificationChannel();
     }
@@ -68,22 +69,23 @@ public class CustomPushNotification {
     public static void clearMessages(int notId) {
         notificationMessages.remove(Integer.toString(notId));
     }
-    
+
     public void onReceived() {
+        Log.d("test2", "handleNotification:"+ mBundle);
         String notId = mBundle.getString("notId");
-        
+
         if (notId == null || notId.isEmpty()) {
             Log.w(TAG, "Missing notification ID, ignoring notification");
             return;
         }
-        
+
         try {
             Integer.parseInt(notId);
         } catch (NumberFormatException e) {
             Log.w(TAG, "Invalid notification ID format: " + notId);
             return;
         }
-        
+
         // Process notification immediately - no need to wait for React Native
         // MMKV is initialized at app startup, so all notification types can work without React
         try {
@@ -92,10 +94,53 @@ public class CustomPushNotification {
             Log.e(TAG, "Failed to process notification", e);
         }
     }
-    
+
     private void handleNotification() {
+        Log.d("test", "handleNotification:"+ mBundle);
         Ejson receivedEjson = safeFromJson(mBundle.getString("ejson", "{}"), Ejson.class);
-        
+
+        // In handleNotification() for message-clear:
+        if (receivedEjson != null && "message-clear".equals(receivedEjson.notificationType)) {
+            String notId = mBundle.getString("notId");
+
+            if (notId != null) {
+                try {
+                    int id = Integer.parseInt(notId);
+                    Log.d(TAG, "🧹 BEFORE CLEAR");
+                    logActiveNotifications();
+
+                    String targetRid = receivedEjson.rid;
+                    Log.d(TAG, "🧹 Target RID: " + targetRid);
+
+                    StatusBarNotification[] active = notificationManager.getActiveNotifications();
+
+                    for (StatusBarNotification sbn : active) {
+                        Notification n = sbn.getNotification();
+
+                        if (n.extras != null) {
+                            String rid = n.extras.getString("rid");
+                            Log.d(TAG, "if block");
+                            if (targetRid != null && targetRid.equals(rid)) {
+                                Log.d(TAG, "🧹 Cancelling notification for rid=" + rid);
+                                notificationManager.cancel(sbn.getTag(), sbn.getId());
+                            }
+                        }
+                    }
+                    Log.d(TAG, "els block");
+
+                    Log.d(TAG, "🧹 AFTER CLEAR");
+                    logActiveNotifications();
+
+                    Log.d(TAG, "✅ Cleared notificationMessages for key: " + id);
+
+                } catch (NumberFormatException e) {
+                    Log.e(TAG, "Invalid notId", e);
+                }
+            }
+
+            return;
+        }
+
         if (receivedEjson != null && receivedEjson.notificationType != null && receivedEjson.notificationType.equals("message-id-only")) {
             Log.d(TAG, "Detected message-id-only notification, will fetch full content from server");
             loadNotificationAndProcess(receivedEjson);
@@ -105,32 +150,62 @@ public class CustomPushNotification {
         // For non-message-id-only notifications, process immediately
         processNotification();
     }
-    
+
+    private void logActiveNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notificationManager != null) {
+            StatusBarNotification[] active = notificationManager.getActiveNotifications();
+
+            Log.d(TAG, "📬 Active notifications count = " + active.length);
+
+            for (StatusBarNotification sbn : active) {
+                Notification n = sbn.getNotification();
+
+                String title = "";
+                String text = "";
+
+                if (n.extras != null) {
+                    title = String.valueOf(n.extras.getCharSequence(Notification.EXTRA_TITLE));
+                    text = String.valueOf(n.extras.getCharSequence(Notification.EXTRA_TEXT));
+                }
+
+                Log.d(TAG,
+                        "🔔 id=" + sbn.getId() +
+                                " tag=" + sbn.getTag() +
+                                " title=" + title +
+                                " text=" + text
+                );
+            }
+        } else {
+            Log.d(TAG, "Cannot read active notifications (API < 23)");
+        }
+    }
+
+
     private void loadNotificationAndProcess(Ejson ejson) {
         notificationLoad(ejson, new Callback() {
             @Override
             public void call(@Nullable Bundle bundle) {
                 if (bundle != null) {
                     Log.d(TAG, "Successfully loaded notification content from server, updating notification props");
-                    
+
                     if (ENABLE_VERBOSE_LOGS) {
                         Log.d(TAG, "[BEFORE update] bundle.notificationLoaded=" + bundle.getBoolean("notificationLoaded", false));
                         Log.d(TAG, "[BEFORE update] bundle.title=" + (bundle.getString("title") != null ? "[present]" : "[null]"));
                         Log.d(TAG, "[BEFORE update] bundle.message length=" + (bundle.getString("message") != null ? bundle.getString("message").length() : 0));
                     }
-                    
+
                     synchronized(CustomPushNotification.this) {
                         mBundle = bundle;
                     }
                 } else {
                     Log.w(TAG, "Failed to load notification content from server, will display placeholder notification");
                 }
-                
+
                 processNotification();
             }
         });
     }
-    
+
     private void processNotification() {
         Ejson loadedEjson = safeFromJson(mBundle.getString("ejson", "{}"), Ejson.class);
         String notId = mBundle.getString("notId", "1");
@@ -169,7 +244,7 @@ public class CustomPushNotification {
         // Decrypt immediately using regular Android Context (mContext)
         // This works without React Native initialization
         String decrypted = Encryption.shared.decryptMessage(ejson, mContext);
-        
+
         if (decrypted != null) {
             bundle.putString("message", decrypted);
             synchronized(this) {
@@ -193,14 +268,38 @@ public class CustomPushNotification {
      * Centralizes the notification display logic.
      */
     private void showNotification(Bundle bundle, Ejson ejson, String notId) {
+        Log.d(TAG, "RAW bundle: " + bundle);
+
+        Log.d(TAG, "📩 showNotification called for notId=" + notId);
+        Log.d(TAG, "📩 Current messages in map: " +
+                (notificationMessages.get(notId) != null ?
+                        notificationMessages.get(notId).size() : "null"));
+
         // Initialize notification message list for this ID
         if (notificationMessages.get(notId) == null) {
+            Log.d(TAG, "📩 Creating new message list for notId=" + notId);
             notificationMessages.put(notId, new ArrayList<>());
         }
 
         // Prepare notification data
         boolean hasSender = ejson != null && ejson.sender != null;
         String title = bundle.getString("title");
+
+        if ((title == null || title.isEmpty()) && ejson != null) {
+            if (ejson.name != null && !ejson.name.isEmpty()) {
+                title = ejson.name;
+            } else if (hasSender) {
+                title = ejson.sender.username;
+            }
+            bundle.putString("title", title);
+        }
+
+        String message = bundle.getString("text");
+
+        if ((message == null || message.isEmpty()) && ejson != null && ejson.msg != null) {
+            message = ejson.msg;
+        }
+        bundle.putString("message", message);
 
         String displaySenderName = (ejson != null && ejson.senderName != null && !ejson.senderName.isEmpty())
                 ? ejson.senderName
@@ -209,9 +308,12 @@ public class CustomPushNotification {
         bundle.putLong("time", new Date().getTime());
         bundle.putString("username", displaySenderName);
         bundle.putString("senderId", hasSender ? ejson.sender._id : "1");
-        
+
         String avatarUri = ejson != null ? ejson.getAvatarUri() : null;
         bundle.putString("avatarUri", avatarUri);
+        String rid = ejson != null ? ejson.rid : bundle.getString("rid");
+        bundle.putString("rid", rid);
+
 
         // Ensure mBundle is updated with all modifications before building notification
         // This ensures buildNotification() sees the complete bundle with all fields (including ejson)
@@ -226,7 +328,7 @@ public class CustomPushNotification {
         } else {
             // Show regular notification
             if (ENABLE_VERBOSE_LOGS) {
-                Log.d(TAG, "[Before add to notificationMessages] notId=" + notId + ", bundle.message length=" + (bundle.getString("message") != null ? bundle.getString("message").length() : 0) + ", bundle.notificationLoaded=" + bundle.getBoolean("notificationLoaded", false));
+                Log.d(TAG, "[Before add to notificationMessages] notId=" + notId + ", bundle.message length=" + (bundle.getString("text") != null ? bundle.getString("text").length() : 0) + ", bundle.notificationLoaded=" + bundle.getBoolean("notificationLoaded", false));
             }
             notificationMessages.get(notId).add(bundle);
             if (ENABLE_VERBOSE_LOGS) {
@@ -242,7 +344,7 @@ public class CustomPushNotification {
      */
     private void handleVideoConfNotification(Bundle bundle, Ejson ejson) {
         VideoConfNotification videoConf = new VideoConfNotification(mContext);
-        
+
         Integer status = ejson.status;
         String rid = ejson.rid;
         // Video conf uses 'caller' field, regular messages use 'sender'
@@ -252,9 +354,9 @@ public class CustomPushNotification {
         } else if (ejson.sender != null && ejson.sender._id != null) {
             callerId = ejson.sender._id;
         }
-        
+
         Log.d(TAG, "Video conf notification - status: " + status + ", rid: " + rid);
-        
+
         if (status == null || status == 0) {
             // Incoming call - show notification
             videoConf.showIncomingCall(bundle, ejson);
@@ -272,7 +374,7 @@ public class CustomPushNotification {
             notificationManager.notify(notificationId, notification.build());
         }
     }
-    
+
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -308,7 +410,7 @@ public class CustomPushNotification {
         Intent intent = new Intent(mContext, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.putExtras(mBundle);
-        
+
         PendingIntent pendingIntent;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             pendingIntent = PendingIntent.getActivity(mContext, notificationId, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -335,6 +437,10 @@ public class CustomPushNotification {
         notificationIcons(notification, mBundle);
         notificationDismiss(notification, notificationId);
 
+        Bundle extras = new Bundle();
+        extras.putString("rid", mBundle.getString("rid"));
+        notification.addExtras(extras);
+
         // if notificationType is null (RC < 3.5) or notificationType is different of message-id-only or notification was loaded successfully
         if (ejson == null || ejson.notificationType == null || !ejson.notificationType.equals("message-id-only") || notificationLoaded) {
             Log.i(TAG, "[buildNotification] ✅ Rendering FULL notification style");
@@ -348,7 +454,7 @@ public class CustomPushNotification {
 
         return notification;
     }
-    
+
     private void cancelPreviousFallbackNotifications(Ejson ejson) {
         for (Map.Entry<String, List<Bundle>> bundleList : notificationMessages.entrySet()) {
             Iterator<Bundle> iterator = bundleList.getValue().iterator();
@@ -543,7 +649,7 @@ public class CustomPushNotification {
         LoadNotification loadNotification = new LoadNotification();
         loadNotification.load(ejson, callback);
     }
-    
+
     /**
      * Safely parses JSON string to object with error handling.
      */
