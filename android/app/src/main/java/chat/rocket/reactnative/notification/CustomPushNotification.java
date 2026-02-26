@@ -21,6 +21,9 @@ import androidx.annotation.Nullable;
 
 import com.google.gson.Gson;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
@@ -388,6 +391,19 @@ public class CustomPushNotification {
         }
     }
 
+    public Bitmap getBitmapFromURL(String src) {
+        try {
+            URL url = new URL(src);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            return BitmapFactory.decodeStream(input);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private Notification.Builder buildNotification(int notificationId) {
         String notId = Integer.toString(notificationId);
         String title = mBundle.getString("title");
@@ -432,6 +448,25 @@ public class CustomPushNotification {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setDefaults(Notification.DEFAULT_ALL)
                 .setAutoCancel(true);
+
+        String imageUrl = "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1d/98/35/74/picture-20210813-164720270.jpg?w=900&h=500&s=1";
+        Bitmap bitmap = getBitmapFromURL(imageUrl);
+
+        if (bitmap != null) {
+            Notification.BigPictureStyle style = new Notification.BigPictureStyle()
+                    .bigPicture(bitmap)
+                    .setSummaryText(message);
+
+            notification.setStyle(style);
+            Log.d("BITMAP_SUCESS","bitmap suces====="+bitmap);
+
+            // 🚀 STOP MessagingStyle from overriding image
+            notificationColor(notification);
+            notificationIcons(notification, mBundle);
+            notificationDismiss(notification, notificationId);
+
+            return notification;
+        }
 
         notificationColor(notification);
         notificationIcons(notification, mBundle);
