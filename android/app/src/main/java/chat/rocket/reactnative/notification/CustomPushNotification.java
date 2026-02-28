@@ -51,6 +51,7 @@ public class CustomPushNotification {
 
     // Constants
     public static final String KEY_REPLY = "KEY_REPLY";
+    public static final String KEY_REPLY_THREAD = "KEY_REPLY_THREAD";
     public static final String NOTIFICATION_ID = "NOTIFICATION_ID";
     private static final String CHANNEL_ID = "rocketchatrn_channel_01";
     private static final String CHANNEL_NAME = "All";
@@ -452,21 +453,21 @@ public class CustomPushNotification {
         String imageUrl = "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1d/98/35/74/picture-20210813-164720270.jpg?w=900&h=500&s=1";
         Bitmap bitmap = getBitmapFromURL(imageUrl);
 
-        if (bitmap != null) {
-            Notification.BigPictureStyle style = new Notification.BigPictureStyle()
-                    .bigPicture(bitmap)
-                    .setSummaryText(message);
+        // if (bitmap != null) {
+        //     Notification.BigPictureStyle style = new Notification.BigPictureStyle()
+        //             .bigPicture(bitmap)
+        //             .setSummaryText(message);
 
-            notification.setStyle(style);
-            Log.d("BITMAP_SUCESS","bitmap suces====="+bitmap);
+        //     notification.setStyle(style);
+        //     Log.d("BITMAP_SUCESS","bitmap suces====="+bitmap);
 
-            // 🚀 STOP MessagingStyle from overriding image
-            notificationColor(notification);
-            notificationIcons(notification, mBundle);
-            notificationDismiss(notification, notificationId);
+        //     // 🚀 STOP MessagingStyle from overriding image
+        //     notificationColor(notification);
+        //     notificationIcons(notification, mBundle);
+        //     notificationDismiss(notification, notificationId);
 
-            return notification;
-        }
+        //     return notification;
+        // }
 
         notificationColor(notification);
         notificationIcons(notification, mBundle);
@@ -669,6 +670,41 @@ public class CustomPushNotification {
         notification
                 .setShowWhen(true)
                 .addAction(replyAction);
+
+        String threadLabel = "Reply in Thread";
+
+        Intent threadReplyIntent = new Intent(mContext, ReplyBroadcast.class);
+        threadReplyIntent.setAction(KEY_REPLY_THREAD);
+        threadReplyIntent.putExtra("pushNotification", bundle);
+
+        PendingIntent threadPendingIntent;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            threadPendingIntent = PendingIntent.getBroadcast(
+                    mContext,
+                    notificationId + 999,   // ⚠️ must be unique
+                    threadReplyIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE
+            );
+        } else {
+            threadPendingIntent = PendingIntent.getBroadcast(
+                    mContext,
+                    notificationId + 999,
+                    threadReplyIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT
+            );
+        }
+
+        RemoteInput threadRemoteInput = new RemoteInput.Builder(KEY_REPLY_THREAD)
+                .setLabel(threadLabel)
+                .build();
+
+        Notification.Action threadReplyAction =
+                new Notification.Action.Builder(smallIconResId, threadLabel, threadPendingIntent)
+                        .addRemoteInput(threadRemoteInput)
+                        .setAllowGeneratedReplies(true)
+                        .build();
+
+        notification.addAction(threadReplyAction);
     }
 
     private void notificationDismiss(Notification.Builder notification, int notificationId) {

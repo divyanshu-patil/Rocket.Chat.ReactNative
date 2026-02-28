@@ -19,6 +19,7 @@ import com.google.gson.GsonBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import okhttp3.Call;
 import okhttp3.MediaType;
@@ -55,7 +56,16 @@ public class ReplyBroadcast extends BroadcastReceiver {
 
             Gson gson = new Gson();
             Ejson ejson = gson.fromJson(bundle.getString("ejson", "{}"), Ejson.class);
+            boolean isThreadReply = CustomPushNotification.KEY_REPLY_THREAD.equals(intent.getAction());
 
+            if (isThreadReply && ejson != null) {
+                // DEMO: always create / reply to this thread
+                String threadID = "TCvOUD1kseaG49Sem";
+                ejson.tmid = threadID;
+                Log.d("THREAD_REPLY", "Replying inside thread with TMID: " + ejson.tmid);
+            } else {
+                Log.d("THREAD_REPLY", "Normal room reply");
+            }
             try {
                 int id = Integer.parseInt(notId);
                 replyToMessage(ejson, id, message);
@@ -68,6 +78,10 @@ public class ReplyBroadcast extends BroadcastReceiver {
     protected void replyToMessage(final Ejson ejson, final int notId, final CharSequence message) {
         String serverURL = ejson.serverURL();
         String rid = ejson.rid;
+
+        Log.d("EJSON_FULL", Objects.requireNonNull(bundle.getString("ejson")));
+        Log.d("EJSON_FULL", ejson.token());
+        Log.d("EJSON_FULL",  ejson.userId());
 
         if (serverURL == null || rid == null) {
             return;
@@ -192,7 +206,15 @@ public class ReplyBroadcast extends BroadcastReceiver {
     private CharSequence getReplyMessage(Intent intent) {
         Bundle remoteInput = RemoteInput.getResultsFromIntent(intent);
         if (remoteInput != null) {
-            return remoteInput.getCharSequence(CustomPushNotification.KEY_REPLY);
+            // 🔹 NORMAL REPLY
+            if (remoteInput.getCharSequence(CustomPushNotification.KEY_REPLY) != null) {
+                return remoteInput.getCharSequence(CustomPushNotification.KEY_REPLY);
+            }
+
+            // 🔹 THREAD REPLY
+            if (remoteInput.getCharSequence(CustomPushNotification.KEY_REPLY_THREAD) != null) {
+                return remoteInput.getCharSequence(CustomPushNotification.KEY_REPLY_THREAD);
+            }
         }
         return null;
     }
