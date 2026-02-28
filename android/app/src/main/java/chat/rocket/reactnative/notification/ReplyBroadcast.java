@@ -59,8 +59,7 @@ public class ReplyBroadcast extends BroadcastReceiver {
             boolean isThreadReply = CustomPushNotification.KEY_REPLY_THREAD.equals(intent.getAction());
 
             if (isThreadReply && ejson != null) {
-                // DEMO: always create / reply to this thread
-                String threadID = "TCvOUD1kseaG49Sem";
+                String threadID = ejson.messageId;
                 ejson.tmid = threadID;
                 Log.d("THREAD_REPLY", "Replying inside thread with TMID: " + ejson.tmid);
             } else {
