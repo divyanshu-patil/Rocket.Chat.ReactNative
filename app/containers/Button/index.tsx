@@ -17,6 +17,8 @@ interface IButtonProps extends PressableProps {
 	style?: StyleProp<ViewStyle> | StyleProp<ViewStyle>[];
 	styleText?: StyleProp<TextStyle> | StyleProp<TextStyle>[];
 	small?: boolean;
+	/** Use Gesture.Tap so first tap registers inside TrueSheet on Android. */
+	useGestureHandlerTouchable?: boolean;
 }
 
 const styles = StyleSheet.create({
@@ -60,6 +62,7 @@ const Button: React.FC<IButtonProps> = ({
 	style,
 	styleText,
 	small,
+	useGestureHandlerTouchable = false,
 	...otherProps
 }) => {
 	const { colors } = useTheme();
@@ -97,6 +100,18 @@ const Button: React.FC<IButtonProps> = ({
 			{loading ? <ActivityIndicator color={resolvedTextColor} style={{ padding: 0 }} /> : <Text style={textStyle}>{title}</Text>}
 		</Pressable>
 	);
+
+	if (useGestureHandlerTouchable) {
+		const firePress = () => {
+			if (!isDisabled) onPress();
+		};
+		const tap = Gesture.Tap().onStart(() => {
+			runOnJS(firePress)();
+		});
+		return <GestureDetector gesture={tap}>{touchable}</GestureDetector>;
+	}
+
+	return touchable;
 };
 
 export default Button;
