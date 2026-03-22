@@ -101,7 +101,17 @@ const ChatsStackNavigator = () => {
 	const { theme } = React.useContext(ThemeContext);
 	return (
 		<ChatsStack.Navigator screenOptions={{ ...defaultHeader, ...themedHeader(theme) }}>
-			<ChatsStack.Screen name='RoomsListView' component={RoomsListView} />
+			<ChatsStack.Screen
+				name='RoomsListView'
+				component={RoomsListView}
+				options={{
+					headerSearchBarOptions: {
+						placeholder: 'Search',
+						hideWhenScrolling: false,
+						autoCapitalize: 'none'
+					}
+				}}
+			/>
 			<ChatsStack.Screen name='RoomView' component={RoomView} />
 			<ChatsStack.Screen name='RoomActionsView' component={RoomActionsView} options={RoomActionsView.navigationOptions} />
 			{/* @ts-ignore */}
@@ -248,7 +258,7 @@ function BottomNavigator() {
 	'use memo';
 
 	return (
-		<BottomTabsNavigator.Navigator>
+		<BottomTabsNavigator.Navigator minimizeBehavior='onScrollDown'>
 			<BottomTabsNavigator.Screen
 				options={{
 					title: 'chats',
@@ -272,6 +282,46 @@ function BottomNavigator() {
 				}}
 				name='SettingsStackNavigator'
 				component={SettingsStackNavigator}
+			/>
+			{/* <BottomTabsNavigator.Screen
+				name='RoomsListView'
+				component={RoomsListView}
+				options={{
+					role: 'search',
+					tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' })
+				}}
+				listeners={({ navigation }) => ({
+					tabPress: e => {
+						e.preventDefault();
+
+						// @ts-ignore
+						navigation.navigate({
+							name: 'ChatsStackNavigator'
+						});
+
+						setTimeout(() => {
+							searchController.current?.startSearch();
+						}, 50);
+					}
+				})}
+			/> */}
+			<BottomTabsNavigator.Screen
+				name='Search'
+				component={ChatsStackNavigator}
+				options={{
+					role: 'search',
+					tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
+					preventsDefault: true
+				}}
+				listeners={({ navigation }) => ({
+					tabPress: () => {
+						// No e.preventDefault() here
+						navigation.navigate('ChatsStackNavigator');
+						setTimeout(() => {
+							searchController.current?.startSearch();
+						}, 150);
+					}
+				})}
 			/>
 			{/* <BottomTabsNavigator.Screen
 				name='RoomsListView'

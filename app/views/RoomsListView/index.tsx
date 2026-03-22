@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import React, { memo, useContext, useEffect } from 'react';
+import React, { memo, useContext, useEffect, useRef } from 'react';
 import { BackHandler, FlatList, RefreshControl } from 'react-native';
 import { useSafeAreaFrame } from 'react-native-safe-area-context';
 import { shallowEqual } from 'react-redux';
@@ -18,6 +18,7 @@ import { goRoom } from '../../lib/methods/helpers/goRoom';
 import { events, logEvent } from '../../lib/methods/helpers/log';
 import { getUserSelector } from '../../selectors/login';
 import { useTheme } from '../../theme';
+import { searchController } from '../../stacks/InsideStack';
 import Container from './components/Container';
 import ListHeader from './components/ListHeader';
 import SectionHeader from './components/SectionHeader';
@@ -34,7 +35,7 @@ const RoomsListView = memo(function RoomsListView() {
 	'use memo';
 
 	useHeader();
-	const { searching, searchEnabled, searchResults, stopSearch } = useContext(RoomsSearchContext);
+	const { searching, searchEnabled, searchResults, stopSearch, startSearch } = useContext(RoomsSearchContext);
 	const { colors } = useTheme();
 	const username = useAppSelector(state => getUserSelector(state).username);
 	const requirePasswordChange = useAppSelector(state => getUserSelector(state).requirePasswordChange);
@@ -50,6 +51,7 @@ const RoomsListView = memo(function RoomsListView() {
 	const changingServer = useAppSelector(state => state.server.changingServer);
 	const { refreshing, onRefresh } = useRefresh({ searching });
 	const supportedVersionsStatus = useAppSelector(state => state.supportedVersions.status);
+	const searchBarRef = useRef(null);
 
 	useEffect(() => {
 		const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -62,6 +64,32 @@ const RoomsListView = memo(function RoomsListView() {
 		});
 		return () => subscription.remove();
 	}, [searchEnabled]);
+
+	useEffect(() => {
+		searchController.current = {
+			startSearch: () => {
+				startSearch(); // your existing context call
+				// Focus the native header search bar
+				navigation.setOptions({
+					headerSearchBarOptions: {
+						ref: searchBarRef,
+						placeholder: 'Search',
+						hideWhenScrolling: false,
+						autoCapitalize: 'none',
+						autoFocus: true // 👈 this triggers the Liquid Glass expansion
+					}
+				});
+			},
+			stopSearch: () => {
+				stopSearch();
+				searchBarRef.current?.blur();
+			}
+		};
+
+		return () => {
+			searchController.current = null;
+		};
+	}, [startSearch, stopSearch]);
 
 	const onPressItem = (item = {} as IRoomItem) => {
 		if (!navigation.isFocused()) {

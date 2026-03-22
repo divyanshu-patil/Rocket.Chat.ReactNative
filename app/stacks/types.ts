@@ -245,6 +245,7 @@ export type BottomTabsParamList = {
 	SettingsStackNavigator: NavigatorScreenParams<SettingsStackParamList>;
 	AdminPanelStackNavigator: NavigatorScreenParams<AdminPanelStackParamList>;
 	AccessibilityStackNavigator: NavigatorScreenParams<AccessibilityStackParamList>;
+	RoomsListView: undefined;
 };
 
 export type NewMessageStackParamList = {
