@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { createRef } from 'react';
 import { I18nManager } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createNativeBottomTabNavigator } from '@bottom-tabs/react-navigation';
 
 import { ThemeContext } from '../theme';
 import { defaultHeader, themedHeader } from '../lib/methods/helpers/navigation';
@@ -85,7 +86,8 @@ import {
 	type NewMessageStackParamList,
 	type ProfileStackParamList,
 	type SettingsStackParamList,
-	type AccessibilityStackParamList
+	type AccessibilityStackParamList,
+	type BottomTabsParamList
 } from './types';
 import { isIOS } from '../lib/methods/helpers';
 import { type TNavigation } from './stackType';
@@ -235,6 +237,58 @@ const AccessibilityStackNavigator = () => {
 	);
 };
 
+export const searchController = createRef<{
+	startSearch: () => void;
+	stopSearch: () => void;
+}>();
+
+// Bottom Tabs
+const BottomTabsNavigator = createNativeBottomTabNavigator<BottomTabsParamList>();
+function BottomNavigator() {
+	'use memo';
+
+	return (
+		<BottomTabsNavigator.Navigator>
+			<BottomTabsNavigator.Screen
+				options={{
+					title: 'chats',
+					tabBarIcon: () => ({ sfSymbol: 'message.fill' })
+				}}
+				name='ChatsStackNavigator'
+				component={ChatsStackNavigator}
+			/>
+			<BottomTabsNavigator.Screen
+				options={{
+					title: 'profile',
+					tabBarIcon: () => ({ sfSymbol: 'person.fill' })
+				}}
+				name='ProfileStackNavigator'
+				component={ProfileStackNavigator}
+			/>
+			<BottomTabsNavigator.Screen
+				options={{
+					title: 'settings',
+					tabBarIcon: () => ({ sfSymbol: 'gear' })
+				}}
+				name='SettingsStackNavigator'
+				component={SettingsStackNavigator}
+			/>
+			{/* <BottomTabsNavigator.Screen
+				name='RoomsListView'
+				// @ts-ignore
+				component={RoomsListView}
+				options={{ role: 'search', tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }) }}
+				listeners={{
+					tabPress: e => {
+						// e.preventDefault(); // ❗ prevent navigation
+						searchController.current?.startSearch();
+					}
+				}}
+			/> */}
+		</BottomTabsNavigator.Navigator>
+	);
+}
+
 // DrawerNavigator
 const Drawer = createDrawerNavigator<DrawerParamList>();
 const DrawerNavigator = () => {
@@ -322,6 +376,7 @@ const InsideStackNavigator = () => {
 	return (
 		<InsideStack.Navigator screenOptions={{ ...defaultHeader, ...themedHeader(theme), presentation: 'containedModal' }}>
 			<InsideStack.Screen name='DrawerNavigator' component={DrawerNavigator} options={{ headerShown: false }} />
+			<InsideStack.Screen name='BottomNavigator' component={BottomNavigator} options={{ headerShown: false }} />
 			<InsideStack.Screen name='NewMessageStackNavigator' component={NewMessageStackNavigator} options={{ headerShown: false }} />
 			<InsideStack.Screen
 				name='E2ESaveYourPasswordStackNavigator'

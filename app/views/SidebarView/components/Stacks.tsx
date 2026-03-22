@@ -48,6 +48,13 @@ const Stacks = ({ currentScreen }: { currentScreen: string | null }) => {
 				backgroundColor={currentScreen === 'SettingsStackNavigator' ? colors.strokeLight : undefined}
 				testID='sidebar-settings'
 			/>
+			<List.Item
+				title={'Bottom tabs'}
+				left={() => <List.Icon name='administration' />}
+				onPress={() => sidebarNavigate('BottomNavigator')}
+				backgroundColor={currentScreen === 'BottomNavigator' ? colors.strokeLight : undefined}
+				testID='sidebar-settings'
+			/>
 			<List.Separator />
 		</>
 	);

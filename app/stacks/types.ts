@@ -239,6 +239,14 @@ export type DrawerParamList = {
 	AccessibilityStackNavigator: NavigatorScreenParams<AccessibilityStackParamList>;
 };
 
+export type BottomTabsParamList = {
+	ChatsStackNavigator: NavigatorScreenParams<ChatsStackParamList>;
+	ProfileStackNavigator: NavigatorScreenParams<ProfileStackParamList>;
+	SettingsStackNavigator: NavigatorScreenParams<SettingsStackParamList>;
+	AdminPanelStackNavigator: NavigatorScreenParams<AdminPanelStackParamList>;
+	AccessibilityStackNavigator: NavigatorScreenParams<AccessibilityStackParamList>;
+};
+
 export type NewMessageStackParamList = {
 	NewMessageView: undefined;
 	SelectedUsersView: {
@@ -277,6 +285,7 @@ export type E2EEnterYourPasswordStackParamList = {
 
 export type InsideStackParamList = {
 	DrawerNavigator: NavigatorScreenParams<DrawerParamList>;
+	BottomNavigator: NavigatorScreenParams<BottomTabsParamList>;
 	NewMessageStackNavigator: NavigatorScreenParams<NewMessageStackParamList>;
 	E2ESaveYourPasswordStackNavigator: NavigatorScreenParams<E2ESaveYourPasswordStackParamList>;
 	E2EEnterYourPasswordStackNavigator: NavigatorScreenParams<E2EEnterYourPasswordStackParamList>;
