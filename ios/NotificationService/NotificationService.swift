@@ -2,63 +2,120 @@ import UserNotifications
 import Intents
 
 class NotificationService: UNNotificationServiceExtension {
-    
+
     var contentHandler: ((UNNotificationContent) -> Void)?
     var bestAttemptContent: UNMutableNotificationContent?
     var finalContent: UNNotificationContent?
     var rocketchat: RocketChat?
-    
+
     // MARK: - Notification Lifecycle
-    
-    override func didReceive(_ request: UNNotificationRequest, withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+
+    override func didReceive(
+        _ request: UNNotificationRequest,
+        withContentHandler contentHandler:
+            @escaping (UNNotificationContent) -> Void
+    ) {    
         self.contentHandler = contentHandler
-        bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
-        
+        bestAttemptContent =
+            (request.content.mutableCopy() as? UNMutableNotificationContent)
+
         if let bestAttemptContent = bestAttemptContent,
-           let ejsonString = bestAttemptContent.userInfo["ejson"] as? String,
-           let ejson = ejsonString.data(using: .utf8),
-           let payload = try? JSONDecoder().decode(Payload.self, from: ejson) {
+            let ejsonString = bestAttemptContent.userInfo["ejson"] as? String,
+            let ejson = ejsonString.data(using: .utf8),
+            let payload = try? JSONDecoder().decode(Payload.self, from: ejson)
+        {
             rocketchat = RocketChat(server: payload.host.removeTrailingSlash())
-            
+            // print("%{public}@", "\(payload)")
             if payload.notificationType == .videoconf {
                 processVideoConf(payload: payload)
             } else if payload.notificationType == .messageIdOnly {
                 fetchMessageContent(payload: payload)
+            } else if payload.notificationType == .messageClear {
+                print(payload)
+                if let rid = payload.rid {
+                    print("inside clear notificatin")
+                    // Pass contentHandler into clearNotification so it fires AFTER removal
+                    clearNotification(rid: rid) { [weak self] in
+                        self?.contentHandler?(UNNotificationContent())
+                    }
+                } else {
+                    print("else block")
+                    contentHandler(UNNotificationContent())
+                }
             } else {
-                processPayload(payload: payload)
+//                processPayload(payload: payload)
             }
         } else {
-            contentHandler(request.content)
+//            contentHandler(request.content)
         }
     }
-    
+
     // MARK: - Processors
-    
+
+    func clearNotification(rid: String, completion: @escaping () -> Void = {}) {
+        UNUserNotificationCenter.current().getDeliveredNotifications {
+            notifications in
+            
+            notifications.forEach {
+                print("🔔 id: \($0.request.identifier), threadId: \($0.request.content.threadIdentifier), categoryId: \($0.request.content.categoryIdentifier)")
+                   }
+            
+            let idsToRemove =
+                notifications
+                .filter { $0.request.content.threadIdentifier == rid }
+                .map { $0.request.identifier }
+
+            if idsToRemove.isEmpty {
+                completion()
+                return
+            }
+
+            UNUserNotificationCenter.current().removeDeliveredNotifications(
+                withIdentifiers: idsToRemove
+            )
+            // removeDeliveredNotifications has no completion, but dispatching async
+            // gives it a tick to process before we call contentHandler
+            DispatchQueue.main.async {
+                completion()
+            }
+        }
+    }
+
     func processVideoConf(payload: Payload) {
         guard let bestAttemptContent = bestAttemptContent else { return }
-        
+
         // Handle Cancelled Calls
         if payload.status == 4 {
             if let rid = payload.rid, let callerId = payload.caller?._id {
-                let notificationId = "\(rid)\(callerId)".replacingOccurrences(of: "[^A-Za-z0-9]", with: "", options: .regularExpression)
-                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [notificationId])
+                let notificationId = "\(rid)\(callerId)".replacingOccurrences(
+                    of: "[^A-Za-z0-9]",
+                    with: "",
+                    options: .regularExpression
+                )
+                UNUserNotificationCenter.current().removeDeliveredNotifications(
+                    withIdentifiers: [notificationId])
             }
             contentHandler?(UNNotificationContent())
             return
         }
-        
+
         // 1. Setup Basic Content
         let callerName = payload.senderName ?? payload.caller?.name ?? "Unknown"
         bestAttemptContent.title = NSLocalizedString("Video Call", comment: "")
-        bestAttemptContent.body = String(format: NSLocalizedString("Incoming call from %@", comment: ""), callerName)
+        bestAttemptContent.body = String(
+            format: NSLocalizedString("Incoming call from %@", comment: ""),
+            callerName
+        )
         bestAttemptContent.categoryIdentifier = "VIDEOCONF"
-        bestAttemptContent.sound = UNNotificationSound(named: UNNotificationSoundName("ringtone.mp3"))
+        bestAttemptContent.sound = UNNotificationSound(
+            named: UNNotificationSoundName("ringtone.mp3")
+        )
         bestAttemptContent.interruptionLevel = .timeSensitive
-        
+
         // 2. Fetch Avatar & Activate Intent
         fetchCallerAvatarData(from: payload) { [weak self] avatarData in
             guard let self = self else { return }
-            
+
             self.activateCommunicationIntent(
                 senderName: callerName,
                 senderUsername: payload.caller?.username ?? "",
@@ -67,53 +124,58 @@ class NotificationService: UNNotificationServiceExtension {
                 isGroup: false,
                 groupName: nil
             )
-            
+
             self.contentHandler?(self.finalContent ?? bestAttemptContent)
         }
     }
-    
+
     func processPayload(payload: Payload) {
         guard let bestAttemptContent = bestAttemptContent else { return }
 
         // 1. Setup Basic Content (Title/Body)
         let senderName = payload.senderName ?? payload.sender?.name ?? "Unknown"
-        let senderUsername = payload.sender?.username ?? payload.senderName ?? ""
-        
+        let senderUsername =
+            payload.sender?.username ?? payload.senderName ?? ""
+
         if bestAttemptContent.title.isEmpty {
             bestAttemptContent.title = senderName
         }
-        
+
         if let roomType = payload.type {
             if roomType == .group || roomType == .channel {
                 // Strip sender prefix if present
                 if let body = bestAttemptContent.body as? String {
                     let prefix = "\(senderUsername): "
                     if body.hasPrefix(prefix) {
-                        bestAttemptContent.body = String(body.dropFirst(prefix.count))
+                        bestAttemptContent.body = String(
+                            body.dropFirst(prefix.count)
+                        )
                     } else {
                         // Try with sender name (display name) as fallback
                         let senderNamePrefix = "\(senderName): "
                         if body.hasPrefix(senderNamePrefix) {
-                            bestAttemptContent.body = String(body.dropFirst(senderNamePrefix.count))
+                            bestAttemptContent.body = String(
+                                body.dropFirst(senderNamePrefix.count)
+                            )
                         }
                     }
                 }
             }
         }
-        
+
         // Handle Decryption (E2E)
         if payload.messageType == .e2e, let rid = payload.rid {
-             if let decrypted = decryptMessage(payload: payload, rid: rid) {
-                 bestAttemptContent.body = decrypted
-             }
+            if let decrypted = decryptMessage(payload: payload, rid: rid) {
+                bestAttemptContent.body = decrypted
+            }
         }
-        
+
         // 2. Fetch Avatar & Activate Intent
         fetchAvatarData(from: payload) { [weak self] avatarData in
             guard let self = self else { return }
-            
+
             let isGroup = (payload.type == .group || payload.type == .channel)
-            
+
             self.activateCommunicationIntent(
                 senderName: senderName,
                 senderUsername: senderUsername,
@@ -122,15 +184,22 @@ class NotificationService: UNNotificationServiceExtension {
                 isGroup: isGroup,
                 groupName: bestAttemptContent.title
             )
-            
+
             self.contentHandler?(self.finalContent ?? bestAttemptContent)
         }
     }
 
     // MARK: - Shared Intent Logic
-    
+
     /// Shared method to create INPerson, INSendMessageIntent, and update the notification
-    private func activateCommunicationIntent(senderName: String, senderUsername: String, avatarData: Data?, conversationId: String, isGroup: Bool, groupName: String?) {
+    private func activateCommunicationIntent(
+        senderName: String,
+        senderUsername: String,
+        avatarData: Data?,
+        conversationId: String,
+        isGroup: Bool,
+        groupName: String?
+    ) {
         guard let bestAttemptContent = bestAttemptContent else { return }
 
         // 1. Create Sender
@@ -138,7 +207,7 @@ class NotificationService: UNNotificationServiceExtension {
         if let data = avatarData {
             senderImage = INImage(imageData: data)
         }
-        
+
         let sender = INPerson(
             personHandle: INPersonHandle(value: senderUsername, type: .unknown),
             nameComponents: nil,
@@ -147,16 +216,21 @@ class NotificationService: UNNotificationServiceExtension {
             contactIdentifier: nil,
             customIdentifier: nil
         )
-        
+
         // 2. Handle Group Logic
         var recipients: [INPerson]?
         var speakableGroupName: INSpeakableString?
-        
+
         if isGroup {
-            speakableGroupName = (groupName != nil) ? INSpeakableString(spokenPhrase: groupName!) : nil
+            speakableGroupName =
+                (groupName != nil)
+                ? INSpeakableString(spokenPhrase: groupName!) : nil
             // Dummy recipient required for iOS to treat as group conversation
             let dummy = INPerson(
-                personHandle: INPersonHandle(value: "placeholder", type: .unknown),
+                personHandle: INPersonHandle(
+                    value: "placeholder",
+                    type: .unknown
+                ),
                 nameComponents: nil,
                 displayName: nil,
                 image: nil,
@@ -165,7 +239,7 @@ class NotificationService: UNNotificationServiceExtension {
             )
             recipients = [dummy]
         }
-        
+
         // 3. Create Intent
         let intent = INSendMessageIntent(
             recipients: recipients,
@@ -177,37 +251,43 @@ class NotificationService: UNNotificationServiceExtension {
             sender: sender,
             attachments: nil
         )
-        
+
         if isGroup {
-            intent.setImage(senderImage, forParameterNamed: \.speakableGroupName)
+            intent.setImage(
+                senderImage,
+                forParameterNamed: \.speakableGroupName
+            )
         }
-        
+
         // 4. Donate & Update
         let interaction = INInteraction(intent: intent, response: nil)
         interaction.direction = .incoming
         interaction.donate(completion: nil)
-        
+
         do {
             self.finalContent = try bestAttemptContent.updating(from: intent)
         } catch {
             self.finalContent = bestAttemptContent
         }
     }
-    
+
     // MARK: - Helpers
-    
+
     private func fetchMessageContent(payload: Payload) {
-        UNUserNotificationCenter.current().getDeliveredNotifications { [weak self] deliveredNotifications in
+        UNUserNotificationCenter.current().getDeliveredNotifications {
+            [weak self] deliveredNotifications in
             guard let self = self else { return }
-            
+
             let identifiersToRemove = deliveredNotifications.filter {
                 $0.request.content.body == "You have a new message"
             }.map { $0.request.identifier }
-            
+
             if identifiersToRemove.count > 0 {
-                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiersToRemove)
+                UNUserNotificationCenter.current().removeDeliveredNotifications(
+                    withIdentifiers: identifiersToRemove
+                )
             }
-            
+
             // Request the content from server
             if let messageId = payload.messageId {
                 self.rocketchat?.getPushWithId(messageId) { notification in
@@ -215,13 +295,20 @@ class NotificationService: UNNotificationServiceExtension {
                         // Set title and body first, processPayload will strip sender prefix for groups/channels
                         self.bestAttemptContent?.title = notification.title
                         self.bestAttemptContent?.body = notification.text
-                        
+
                         // Update ejson with full payload from server for correct navigation
-                        if let payloadData = try? JSONEncoder().encode(notification.payload),
-                           let payloadString = String(data: payloadData, encoding: .utf8) {
-                            self.bestAttemptContent?.userInfo["ejson"] = payloadString
+                        if let payloadData = try? JSONEncoder().encode(
+                            notification.payload
+                        ),
+                            let payloadString = String(
+                                data: payloadData,
+                                encoding: .utf8
+                            )
+                        {
+                            self.bestAttemptContent?.userInfo["ejson"] =
+                                payloadString
                         }
-                        
+
                         self.processPayload(payload: notification.payload)
                     } else {
                         // Server returned no notification, deliver as-is
@@ -238,49 +325,73 @@ class NotificationService: UNNotificationServiceExtension {
             }
         }
     }
-    
+
     private func decryptMessage(payload: Payload, rid: String) -> String? {
-        if let content = payload.content, (content.algorithm == "rc.v1.aes-sha2" || content.algorithm == "rc.v2.aes-sha2") {
+        if let content = payload.content,
+            content.algorithm == "rc.v1.aes-sha2"
+                || content.algorithm == "rc.v2.aes-sha2"
+        {
             return rocketchat?.decryptContent(rid: rid, content: content)
         } else if let msg = payload.msg, !msg.isEmpty {
-            return rocketchat?.decryptContent(rid: rid, content: EncryptedContent(algorithm: "rc.v1.aes-sha2", ciphertext: msg, kid: nil, iv: nil))
+            return rocketchat?.decryptContent(
+                rid: rid,
+                content: EncryptedContent(
+                    algorithm: "rc.v1.aes-sha2",
+                    ciphertext: msg,
+                    kid: nil,
+                    iv: nil
+                )
+            )
         }
         return nil
     }
 
     // MARK: - Avatar Fetching
-    
+
     /// Fetches avatar image data from a given avatar path
-    private func fetchAvatarDataFromPath(avatarPath: String, server: String, credentials: Credentials, completion: @escaping (Data?) -> Void) {
+    private func fetchAvatarDataFromPath(
+        avatarPath: String,
+        server: String,
+        credentials: Credentials,
+        completion: @escaping (Data?) -> Void
+    ) {
         // URL-encode credentials to prevent malformed URLs if they contain special characters
-        guard let encodedToken = credentials.userToken.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let encodedUserId = credentials.userId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+        guard
+            let encodedToken = credentials.userToken.addingPercentEncoding(
+                withAllowedCharacters: .urlQueryAllowed
+            ),
+            let encodedUserId = credentials.userId.addingPercentEncoding(
+                withAllowedCharacters: .urlQueryAllowed
+            )
+        else {
             completion(nil)
             return
         }
-        
-        let fullPath = "\(avatarPath)?format=png&size=100&rc_token=\(encodedToken)&rc_uid=\(encodedUserId)"
+
+        let fullPath =
+            "\(avatarPath)?format=png&size=100&rc_token=\(encodedToken)&rc_uid=\(encodedUserId)"
         guard let avatarURL = URL(string: server + fullPath) else {
             completion(nil)
             return
         }
-        
+
         // Create URLSessionConfiguration with proper timeouts for notification service extension
         // timeoutIntervalForResource ensures total download time is limited (not just inactivity)
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 3 // Inactivity timeout
-        config.timeoutIntervalForResource = 3 // Total download timeout (critical for notification extensions)
+        config.timeoutIntervalForRequest = 3  // Inactivity timeout
+        config.timeoutIntervalForResource = 3  // Total download timeout (critical for notification extensions)
         let session = URLSession(configuration: config)
-        
+
         var request = URLRequest(url: avatarURL)
         request.httpMethod = "GET"
         request.addValue(Bundle.userAgent, forHTTPHeaderField: "User-Agent")
-        
+
         let task = session.dataTask(with: request) { data, response, error in
             guard error == nil,
-                  let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200,
-                  let data = data else {
+                let httpResponse = response as? HTTPURLResponse,
+                httpResponse.statusCode == 200,
+                let data = data
+            else {
                 completion(nil)
                 return
             }
@@ -288,31 +399,48 @@ class NotificationService: UNNotificationServiceExtension {
         }
         task.resume()
     }
-    
+
     /// Fetches avatar image data for video conference caller
-    func fetchCallerAvatarData(from payload: Payload, completion: @escaping (Data?) -> Void) {
+    func fetchCallerAvatarData(
+        from payload: Payload,
+        completion: @escaping (Data?) -> Void
+    ) {
         let server = payload.host.removeTrailingSlash()
         guard let credentials = Storage().getCredentials(server: server),
-              let username = payload.caller?.username,
-              let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            let username = payload.caller?.username,
+            let encoded = username.addingPercentEncoding(
+                withAllowedCharacters: .urlPathAllowed
+            )
+        else {
             completion(nil)
             return
         }
-        fetchAvatarDataFromPath(avatarPath: "/avatar/\(encoded)", server: server, credentials: credentials, completion: completion)
+        fetchAvatarDataFromPath(
+            avatarPath: "/avatar/\(encoded)",
+            server: server,
+            credentials: credentials,
+            completion: completion
+        )
     }
 
     /// Fetches avatar image data - sender's avatar for DMs, room avatar for groups/channels
-    func fetchAvatarData(from payload: Payload, completion: @escaping (Data?) -> Void) {
+    func fetchAvatarData(
+        from payload: Payload,
+        completion: @escaping (Data?) -> Void
+    ) {
         let server = payload.host.removeTrailingSlash()
         guard let credentials = Storage().getCredentials(server: server) else {
             completion(nil)
             return
         }
-        
+
         let avatarPath: String
         if payload.type == .direct {
             guard let username = payload.sender?.username,
-                  let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                let encoded = username.addingPercentEncoding(
+                    withAllowedCharacters: .urlPathAllowed
+                )
+            else {
                 completion(nil)
                 return
             }
@@ -324,7 +452,12 @@ class NotificationService: UNNotificationServiceExtension {
             }
             avatarPath = "/avatar/room/\(rid)"
         }
-        
-        fetchAvatarDataFromPath(avatarPath: avatarPath, server: server, credentials: credentials, completion: completion)
+
+        fetchAvatarDataFromPath(
+            avatarPath: avatarPath,
+            server: server,
+            credentials: credentials,
+            completion: completion
+        )
     }
 }
