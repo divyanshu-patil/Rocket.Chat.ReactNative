@@ -87,11 +87,13 @@ import {
 	type ProfileStackParamList,
 	type SettingsStackParamList,
 	type AccessibilityStackParamList,
-	type BottomTabsParamList
+	type BottomTabsParamList,
+	type SearchStackParamList
 } from './types';
 import { isIOS } from '../lib/methods/helpers';
 import { type TNavigation } from './stackType';
 import AccessibilityAndAppearanceView from '../views/AccessibilityAndAppearanceView';
+import SearchView from '../views/SearchView';
 
 // ChatsStackNavigator
 const ChatsStack = createNativeStackNavigator<ChatsStackParamList & TNavigation>();
@@ -105,11 +107,13 @@ const ChatsStackNavigator = () => {
 				name='RoomsListView'
 				component={RoomsListView}
 				options={{
-					headerSearchBarOptions: {
-						placeholder: 'Search',
-						hideWhenScrolling: false,
-						autoCapitalize: 'none'
-					}
+					title: ''
+					// headerShown: false
+					// headerSearchBarOptions: {
+					// 	placeholder: 'Search',
+					// 	hideWhenScrolling: false,
+					// 	autoCapitalize: 'none'
+					// }
 				}}
 			/>
 			<ChatsStack.Screen name='RoomView' component={RoomView} />
@@ -247,6 +251,34 @@ const AccessibilityStackNavigator = () => {
 	);
 };
 
+const SearchStack = createNativeStackNavigator<SearchStackParamList>();
+
+function SearchNavigator() {
+	'use memo';
+
+	return (
+		<SearchStack.Navigator>
+			<SearchStack.Screen
+				name='SearchView'
+				component={SearchView}
+				options={({ navigation }) => ({
+					headerLargeTitle: false,
+					headerSearchBarOptions: {
+						placeholder: 'Search',
+						// autoCapitalize: false,
+						onChangeText: e => {
+							const { text } = e.nativeEvent;
+
+							// pass to screen
+							navigation.setParams({ query: text });
+						}
+					}
+				})}
+			/>
+		</SearchStack.Navigator>
+	);
+}
+
 export const searchController = createRef<{
 	startSearch: () => void;
 	stopSearch: () => void;
@@ -306,22 +338,21 @@ function BottomNavigator() {
 				})}
 			/> */}
 			<BottomTabsNavigator.Screen
-				name='Search'
-				component={ChatsStackNavigator}
+				name='SearchViewNav'
+				component={SearchNavigator}
 				options={{
 					role: 'search',
-					tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
-					preventsDefault: true
+					tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' })
 				}}
-				listeners={({ navigation }) => ({
-					tabPress: () => {
-						// No e.preventDefault() here
-						navigation.navigate('ChatsStackNavigator');
-						setTimeout(() => {
-							searchController.current?.startSearch();
-						}, 150);
-					}
-				})}
+				// listeners={({ navigation }) => ({
+				// 	tabPress: () => {
+				// 		// No e.preventDefault() here
+				// 		navigation.navigate('ChatsStackNavigator');
+				// 		setTimeout(() => {
+				// 			searchController.current?.startSearch();
+				// 		}, 150);
+				// 	}
+				// })}
 			/>
 			{/* <BottomTabsNavigator.Screen
 				name='RoomsListView'

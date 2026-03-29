@@ -34,7 +34,7 @@ const INITIAL_NUM_TO_RENDER = isTablet ? 20 : 12;
 const RoomsListView = memo(function RoomsListView() {
 	'use memo';
 
-	useHeader();
+	// useHeader();
 	const { searching, searchEnabled, searchResults, stopSearch, startSearch } = useContext(RoomsSearchContext);
 	const { colors } = useTheme();
 	const username = useAppSelector(state => getUserSelector(state).username);
@@ -64,32 +64,6 @@ const RoomsListView = memo(function RoomsListView() {
 		});
 		return () => subscription.remove();
 	}, [searchEnabled]);
-
-	useEffect(() => {
-		searchController.current = {
-			startSearch: () => {
-				startSearch(); // your existing context call
-				// Focus the native header search bar
-				navigation.setOptions({
-					headerSearchBarOptions: {
-						ref: searchBarRef,
-						placeholder: 'Search',
-						hideWhenScrolling: false,
-						autoCapitalize: 'none',
-						autoFocus: true // 👈 this triggers the Liquid Glass expansion
-					}
-				});
-			},
-			stopSearch: () => {
-				stopSearch();
-				searchBarRef.current?.blur();
-			}
-		};
-
-		return () => {
-			searchController.current = null;
-		};
-	}, [startSearch, stopSearch]);
 
 	const onPressItem = (item = {} as IRoomItem) => {
 		if (!navigation.isFocused()) {

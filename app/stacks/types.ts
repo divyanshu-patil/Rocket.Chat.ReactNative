@@ -231,6 +231,12 @@ export type DisplayPrefStackParamList = {
 	DisplayPrefsView: undefined;
 };
 
+export type SearchStackParamList = {
+	SearchView: {
+		query?: string;
+	};
+};
+
 export type DrawerParamList = {
 	ChatsStackNavigator: NavigatorScreenParams<ChatsStackParamList>;
 	ProfileStackNavigator: NavigatorScreenParams<ProfileStackParamList>;
@@ -246,6 +252,7 @@ export type BottomTabsParamList = {
 	AdminPanelStackNavigator: NavigatorScreenParams<AdminPanelStackParamList>;
 	AccessibilityStackNavigator: NavigatorScreenParams<AccessibilityStackParamList>;
 	RoomsListView: undefined;
+	SearchViewNav: undefined;
 };
 
 export type NewMessageStackParamList = {
