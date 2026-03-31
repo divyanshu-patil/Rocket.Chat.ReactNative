@@ -231,12 +231,28 @@ export type DisplayPrefStackParamList = {
 	DisplayPrefsView: undefined;
 };
 
+export type SearchStackParamList = {
+	SearchView: {
+		query?: string;
+	};
+};
+
 export type DrawerParamList = {
 	ChatsStackNavigator: NavigatorScreenParams<ChatsStackParamList>;
 	ProfileStackNavigator: NavigatorScreenParams<ProfileStackParamList>;
 	SettingsStackNavigator: NavigatorScreenParams<SettingsStackParamList>;
 	AdminPanelStackNavigator: NavigatorScreenParams<AdminPanelStackParamList>;
 	AccessibilityStackNavigator: NavigatorScreenParams<AccessibilityStackParamList>;
+};
+
+export type BottomTabsParamList = {
+	ChatsStackNavigator: NavigatorScreenParams<ChatsStackParamList>;
+	ProfileStackNavigator: NavigatorScreenParams<ProfileStackParamList>;
+	SettingsStackNavigator: NavigatorScreenParams<SettingsStackParamList>;
+	AdminPanelStackNavigator: NavigatorScreenParams<AdminPanelStackParamList>;
+	AccessibilityStackNavigator: NavigatorScreenParams<AccessibilityStackParamList>;
+	RoomsListView: undefined;
+	SearchViewNav: undefined;
 };
 
 export type NewMessageStackParamList = {
@@ -277,6 +293,7 @@ export type E2EEnterYourPasswordStackParamList = {
 
 export type InsideStackParamList = {
 	DrawerNavigator: NavigatorScreenParams<DrawerParamList>;
+	BottomNavigator: NavigatorScreenParams<BottomTabsParamList>;
 	NewMessageStackNavigator: NavigatorScreenParams<NewMessageStackParamList>;
 	E2ESaveYourPasswordStackNavigator: NavigatorScreenParams<E2ESaveYourPasswordStackParamList>;
 	E2EEnterYourPasswordStackNavigator: NavigatorScreenParams<E2EEnterYourPasswordStackParamList>;

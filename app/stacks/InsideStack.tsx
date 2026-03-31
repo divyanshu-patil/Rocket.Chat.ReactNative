@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { createRef } from 'react';
 import { I18nManager } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createNativeBottomTabNavigator } from '@bottom-tabs/react-navigation';
 
-import { ThemeContext } from '../theme';
+import { ThemeContext, useTheme } from '../theme';
 import { defaultHeader, themedHeader } from '../lib/methods/helpers/navigation';
 import Sidebar from '../views/SidebarView';
 // Chats Stack
@@ -85,11 +86,14 @@ import {
 	type NewMessageStackParamList,
 	type ProfileStackParamList,
 	type SettingsStackParamList,
-	type AccessibilityStackParamList
+	type AccessibilityStackParamList,
+	type BottomTabsParamList,
+	type SearchStackParamList
 } from './types';
 import { isIOS } from '../lib/methods/helpers';
 import { type TNavigation } from './stackType';
 import AccessibilityAndAppearanceView from '../views/AccessibilityAndAppearanceView';
+import SearchView from '../views/SearchView';
 
 // ChatsStackNavigator
 const ChatsStack = createNativeStackNavigator<ChatsStackParamList & TNavigation>();
@@ -99,7 +103,19 @@ const ChatsStackNavigator = () => {
 	const { theme } = React.useContext(ThemeContext);
 	return (
 		<ChatsStack.Navigator screenOptions={{ ...defaultHeader, ...themedHeader(theme) }}>
-			<ChatsStack.Screen name='RoomsListView' component={RoomsListView} />
+			<ChatsStack.Screen
+				name='RoomsListView'
+				component={RoomsListView}
+				options={{
+					title: ''
+					// headerShown: false
+					// headerSearchBarOptions: {
+					// 	placeholder: 'Search',
+					// 	hideWhenScrolling: false,
+					// 	autoCapitalize: 'none'
+					// }
+				}}
+			/>
 			<ChatsStack.Screen name='RoomView' component={RoomView} />
 			<ChatsStack.Screen name='RoomActionsView' component={RoomActionsView} options={RoomActionsView.navigationOptions} />
 			{/* @ts-ignore */}
@@ -235,6 +251,135 @@ const AccessibilityStackNavigator = () => {
 	);
 };
 
+const SearchStack = createNativeStackNavigator<SearchStackParamList>();
+
+function SearchNavigator() {
+	'use memo';
+
+	const { colors } = useTheme();
+
+	return (
+		<SearchStack.Navigator
+			screenOptions={{
+				headerStyle: {
+					backgroundColor: colors.surfaceNeutral
+				}
+			}}>
+			<SearchStack.Screen
+				name='SearchView'
+				component={SearchView}
+				options={({ navigation }) => ({
+					headerLargeTitle: false,
+					headerSearchBarOptions: {
+						placeholder: 'Search',
+						// autoCapitalize: false,
+						onChangeText: e => {
+							const { text } = e.nativeEvent;
+
+							// pass to screen
+							navigation.setParams({ query: text });
+						}
+					}
+				})}
+			/>
+		</SearchStack.Navigator>
+	);
+}
+
+export const searchController = createRef<{
+	startSearch: () => void;
+	stopSearch: () => void;
+}>();
+
+// Bottom Tabs .\
+const BottomTabsNavigator = createNativeBottomTabNavigator<BottomTabsParamList>();
+function BottomNavigator() {
+	'use memo';
+
+	return (
+		<BottomTabsNavigator.Navigator minimizeBehavior='onScrollDown'>
+			<BottomTabsNavigator.Screen
+				options={{
+					title: 'channels',
+					tabBarIcon: () => ({ sfSymbol: 'message.fill' })
+					// tabBarBadge: '10'
+				}}
+				name='ChatsStackNavigator'
+				component={ChatsStackNavigator}
+			/>
+			<BottomTabsNavigator.Screen
+				options={{
+					title: 'DMs',
+					tabBarIcon: () => ({ sfSymbol: 'person.fill' })
+					// tabBarBadge: '3'
+				}}
+				name='ProfileStackNavigator'
+				component={ProfileStackNavigator}
+			/>
+			<BottomTabsNavigator.Screen
+				options={{
+					title: 'Discussions',
+					tabBarIcon: () => ({ sfSymbol: 'bubble.left.and.bubble.right.fill' })
+					// tabBarBadge: '1'
+				}}
+				name='SettingsStackNavigator'
+				component={SettingsStackNavigator}
+			/>
+			{/* <BottomTabsNavigator.Screen
+				name='RoomsListView'
+				component={RoomsListView}
+				options={{
+					role: 'search',
+					tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' })
+				}}
+				listeners={({ navigation }) => ({
+					tabPress: e => {
+						e.preventDefault();
+
+						// @ts-ignore
+						navigation.navigate({
+							name: 'ChatsStackNavigator'
+						});
+
+						setTimeout(() => {
+							searchController.current?.startSearch();
+						}, 50);
+					}
+				})}
+			/> */}
+			<BottomTabsNavigator.Screen
+				name='SearchViewNav'
+				component={SearchNavigator}
+				options={{
+					role: 'search',
+					tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' })
+				}}
+				// listeners={({ navigation }) => ({
+				// 	tabPress: () => {
+				// 		// No e.preventDefault() here
+				// 		navigation.navigate('ChatsStackNavigator');
+				// 		setTimeout(() => {
+				// 			searchController.current?.startSearch();
+				// 		}, 150);
+				// 	}
+				// })}
+			/>
+			{/* <BottomTabsNavigator.Screen
+				name='RoomsListView'
+				// @ts-ignore
+				component={RoomsListView}
+				options={{ role: 'search', tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }) }}
+				listeners={{
+					tabPress: e => {
+						// e.preventDefault(); // ❗ prevent navigation
+						searchController.current?.startSearch();
+					}
+				}}
+			/> */}
+		</BottomTabsNavigator.Navigator>
+	);
+}
+
 // DrawerNavigator
 const Drawer = createDrawerNavigator<DrawerParamList>();
 const DrawerNavigator = () => {
@@ -322,6 +467,7 @@ const InsideStackNavigator = () => {
 	return (
 		<InsideStack.Navigator screenOptions={{ ...defaultHeader, ...themedHeader(theme), presentation: 'containedModal' }}>
 			<InsideStack.Screen name='DrawerNavigator' component={DrawerNavigator} options={{ headerShown: false }} />
+			{/* <InsideStack.Screen name='BottomNavigator' component={BottomNavigator} options={{ headerShown: false }} /> */}
 			<InsideStack.Screen name='NewMessageStackNavigator' component={NewMessageStackNavigator} options={{ headerShown: false }} />
 			<InsideStack.Screen
 				name='E2ESaveYourPasswordStackNavigator'
