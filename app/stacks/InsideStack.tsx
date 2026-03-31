@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createNativeBottomTabNavigator } from '@bottom-tabs/react-navigation';
 
-import { ThemeContext } from '../theme';
+import { ThemeContext, useTheme } from '../theme';
 import { defaultHeader, themedHeader } from '../lib/methods/helpers/navigation';
 import Sidebar from '../views/SidebarView';
 // Chats Stack
@@ -256,8 +256,15 @@ const SearchStack = createNativeStackNavigator<SearchStackParamList>();
 function SearchNavigator() {
 	'use memo';
 
+	const { colors } = useTheme();
+
 	return (
-		<SearchStack.Navigator>
+		<SearchStack.Navigator
+			screenOptions={{
+				headerStyle: {
+					backgroundColor: colors.surfaceNeutral
+				}
+			}}>
 			<SearchStack.Screen
 				name='SearchView'
 				component={SearchView}
